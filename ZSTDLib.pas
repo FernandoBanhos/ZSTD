@@ -110,9 +110,8 @@ const
   sZSTD_sizeof_DDict                        = 'ZSTD_sizeof_DDict';
 
 type
-  {$IFDEF FPC}
-    ssize_t = NativeUInt;
-  {$ENDIF}
+  ssize_t = NativeInt; // signed
+  size_t = NativeUInt; // unsigned
 
   EZSTDException = class(Exception)
   public

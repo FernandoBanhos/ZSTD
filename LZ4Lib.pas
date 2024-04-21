@@ -644,9 +644,8 @@ LZ4_DEPRECATED("use LZ4_resetStreamHC() instead") LZ4LIB_API  int   LZ4_resetStr
  *  Error management
  **************************************)
 type
-  {$IFDEF FPC}
-    ssize_t = NativeUInt;
-  {$ENDIF}
+  ssize_t = NativeInt; // signed
+  size_t = NativeUInt; // unsigned
   LZ4F_errorCode_t = type size_t;
 
 procedure LZ4FError(const AFunctionName: string; ACode: LZ4F_errorCode_t);
