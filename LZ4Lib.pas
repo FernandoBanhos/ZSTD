@@ -62,8 +62,19 @@ unit LZ4Lib;
 
 interface
 
+{$IFDEF FPC}
+  {$MODE DELPHI}
+  {$PACKRECORDS C}
+{$ENDIF}
+
 uses
-  Windows, SysUtils;
+  {$IFDEF MSWINDOWS}
+    Windows,
+  {$ENDIF}
+  {$IFDEF FPC}
+    DynLibs,
+  {$ENDIF}
+  SysUtils;
 
 {$Z4}
 
@@ -71,8 +82,13 @@ uses
 const
   LZ4DllName = 'liblz4.dll';
 {$ELSE}
-var
-  LZ4DllName: UnicodeString;
+const
+  {$IFDEF MSWINDOWS}
+    ZSTDDllName = 'liblz4.dll';
+  {$ENDIF}
+  {$IFDEF LINUX}
+    ZSTDDllName = 'liblz4.so';
+  {$ENDIF}
 {$ENDIF}
 
 const
@@ -628,6 +644,9 @@ LZ4_DEPRECATED("use LZ4_resetStreamHC() instead") LZ4LIB_API  int   LZ4_resetStr
  *  Error management
  **************************************)
 type
+  {$IFDEF FPC}
+    ssize_t = NativeUInt;
+  {$ENDIF}
   LZ4F_errorCode_t = type size_t;
 
 procedure LZ4FError(const AFunctionName: string; ACode: LZ4F_errorCode_t);
@@ -934,6 +953,8 @@ function LZ4F_decompress(dctx: LZ4F_dctx; dstBuffer: Pointer; var dstSizePtr: si
  *  and start a new one using same context resources. *)
 procedure LZ4F_resetDecompressionContext(dctx: LZ4F_dctx); (* always successful *) {$IFDEF STATIC_LINKING}cdecl; external LZ4DllName name sLZ4F_resetDecompressionContext;{$ENDIF}
 
+function LZ4FIsLoaded: boolean;
+
 implementation
 
 type
@@ -1120,7 +1141,7 @@ begin
   EnterCriticalSection(LZ4Lock);
   try
     if LZ4 <> 0 then Exit;
-    LZ4 := LoadLibraryW(PWideChar(LZ4DllName));
+    LZ4 := SafeLoadLibrary(LZ4DllName);
     if LZ4 = 0 then Exit;
 
     @_LZ4_versionNumber := GetProcAddress(LZ4, sLZ4_versionNumber);
@@ -1651,6 +1672,12 @@ begin
     _LZ4F_resetDecompressionContext(dctx)
   else
     begin RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+end;
+
+function LZ4FIsLoaded: boolean;
+begin
+  InitLZ4;
+  Result := LZ4 <> 0;
 end;
 
 initialization

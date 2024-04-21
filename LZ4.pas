@@ -2,8 +2,16 @@ unit LZ4;
 
 interface
 
+{$IFDEF FPC}
+  {$MODE DELPHI}
+  {$PACKRECORDS C}
+{$ENDIF}
+
 uses
-  Windows, Classes, LZ4Lib;
+  {$IFDEF MSWINDOWS}
+    Windows,
+  {$ENDIF}
+  Classes, LZ4Lib;
 
 procedure LZ4CompressStream(ASource, ADest: TStream; ALevel: Integer; ACount: Int64 = 0);
 procedure LZ4DecompressStream(ASource, ADest: TStream; ACount: Int64 = 0);
