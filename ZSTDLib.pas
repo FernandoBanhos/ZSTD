@@ -35,7 +35,12 @@ const
   ZSTDDllName = 'libzstd.dll';
 {$ELSE}
 const
-  ZSTDDllName = 'libzstd.dll';
+  {$IFDEF MSWINDOWS}
+    ZSTDDllName = 'libzstd.dll';
+  {$ENDIF}
+  {$IFDEF LINUX}
+    ZSTDDllName = 'libzstd.so';
+  {$ENDIF}
 {$ENDIF}
 
 const
