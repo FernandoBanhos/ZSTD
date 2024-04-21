@@ -14,8 +14,19 @@ unit ZSTDLib;
 
 interface
 
+{$IFDEF FPC}
+  {$MODE DELPHI}
+  {$PACKRECORDS C}
+{$ENDIF}
+
 uses
-  Windows, SysUtils;
+  {$IFDEF MSWINDOWS}
+    Windows,
+  {$ENDIF}
+  {$IFDEF FPC}
+    DynLibs,
+  {$ENDIF}
+  SysUtils;
 
 {$Z4}
 
@@ -23,8 +34,8 @@ uses
 const
   ZSTDDllName = 'libzstd.dll';
 {$ELSE}
-var
-  ZSTDDllName: UnicodeString;
+const
+  ZSTDDllName = 'libzstd.dll';
 {$ENDIF}
 
 const
@@ -94,11 +105,15 @@ const
   sZSTD_sizeof_DDict                        = 'ZSTD_sizeof_DDict';
 
 type
+  {$IFDEF FPC}
+    ssize_t = NativeUInt;
+  {$ENDIF}
+
   EZSTDException = class(Exception)
   public
     constructor Create(const AFunctionName: string; ACode: ssize_t);
   private
-    FCode: SSIZE_T
+    FCode: ssize_t
   end;
 
 procedure ZSTDError(const AFunctionName: string; ACode: size_t);
@@ -990,6 +1005,7 @@ function ZSTD_sizeof_CStream(zcs: ZSTD_CStream ): size_t; {$IFDEF ZSTD_STATIC_LI
 function ZSTD_sizeof_DStream(zds: ZSTD_DStream): size_t; {$IFDEF ZSTD_STATIC_LINKING}cdecl; external ZSTDDllName name sZSTD_sizeof_DStream;{$ENDIF}
 function ZSTD_sizeof_CDict(cdict: ZSTD_CDict): size_t; {$IFDEF ZSTD_STATIC_LINKING}cdecl; external ZSTDDllName name sZSTD_sizeof_CDict;{$ENDIF}
 function ZSTD_sizeof_DDict(ddict: ZSTD_DDict): size_t; {$IFDEF ZSTD_STATIC_LINKING}cdecl; external ZSTDDllName name sZSTD_sizeof_DDict;{$ENDIF}
+function ZSTDIsLoaded: boolean;
 
 implementation
 
@@ -1188,7 +1204,7 @@ begin
   EnterCriticalSection(ZSTDLock);
   try
     if ZSTD <> 0 then Exit;
-    ZSTD := LoadLibraryW(PWideChar(ZSTDDllName));
+    ZSTD := SafeLoadLibrary(ZSTDDllName);
     if ZSTD = 0 then Exit;
 
     @_ZSTD_versionNumber                       := GetProcAddress(ZSTD, sZSTD_versionNumber);
@@ -1839,6 +1855,12 @@ begin
     Result := _ZSTD_sizeof_DDict(ddict)
   else
     begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+end;
+
+function ZSTDIsLoaded: boolean;
+begin
+  InitZSTD;
+  Result := ZSTD <> 0;
 end;
 
 initialization

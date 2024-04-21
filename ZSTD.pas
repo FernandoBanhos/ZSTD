@@ -2,8 +2,16 @@ unit ZSTD;
 
 interface
 
+{$IFDEF FPC}
+  {$MODE DELPHI}
+  {$PACKRECORDS C}
+{$ENDIF}
+
 uses
-  Windows, Classes, ZSTDLib;
+  {$IFDEF MSWINDOWS}
+    Windows,
+  {$ENDIF}
+  Classes, ZSTDLib;
 
 type
   TZSTDCompressOptions = record
