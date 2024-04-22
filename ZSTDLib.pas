@@ -10,7 +10,7 @@ unit ZSTDLib;
  * You may select, at your option, one of the above-listed licenses.
  *)
 
-{ $DEFINE ZSTD_STATIC_LINKING}
+{.$DEFINE ZSTD_STATIC_LINKING}
 
 interface
 
@@ -30,10 +30,6 @@ uses
 
 {$Z4}
 
-{$IFDEF ZSTD_STATIC_LINKING}
-const
-  ZSTDDllName = 'libzstd.dll';
-{$ELSE}
 const
   {$IFDEF MSWINDOWS}
     ZSTDDllName = 'libzstd.dll';
@@ -41,7 +37,6 @@ const
   {$IFDEF LINUX}
     ZSTDDllName = 'libzstd.so';
   {$ENDIF}
-{$ENDIF}
 
 const
   sZSTD_versionNumber                       = 'ZSTD_versionNumber';

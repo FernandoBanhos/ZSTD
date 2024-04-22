@@ -78,10 +78,6 @@ uses
 
 {$Z4}
 
-{$IFDEF STATIC_LINKING}
-const
-  LZ4DllName = 'liblz4.dll';
-{$ELSE}
 const
   {$IFDEF MSWINDOWS}
     ZSTDDllName = 'liblz4.dll';
@@ -89,7 +85,6 @@ const
   {$IFDEF LINUX}
     ZSTDDllName = 'liblz4.so';
   {$ENDIF}
-{$ENDIF}
 
 const
   sLZ4_versionNumber = 'LZ4_versionNumber';
