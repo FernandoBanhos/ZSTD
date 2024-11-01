@@ -334,7 +334,11 @@ end;
 
 procedure TZSTDCompressOptions.Init;
 begin
-  ZeroMemory(@Self, SizeOf(Self));
+  {$IFDEF FPC}
+    FillByte(Self, SizeOf(Self), 0);
+  {$ELSE}
+    ZeroMemory(@Self, SizeOf(Self));
+  {$ENDIF}
   CompressionLevel := ZSTD_CLEVEL_DEFAULT;
   DictIDFlag := True;
 end;
@@ -526,7 +530,7 @@ begin
     ((JobSize          <> 0) and ((JobSize          < JobSizeMin)          or (JobSize          > JobSizeMax))) or
     ((OverlapLog       <> 0) and ((OverlapLog       < OverlapLogMin)       or (OverlapLog       > OverlapLogMax)))
   then
-    RaiseLastOSError(ERROR_INVALID_PARAMETER);
+    RaiseLastOSError(ZSTD_ERROR_INVALID_PARAMETER);
 end;
 
 //**************************************************************************************************
@@ -535,7 +539,11 @@ end;
 
 procedure TZSTDDecompressOptions.Init;
 begin
-  ZeroMemory(@Self, SizeOf(Self));
+  {$IFDEF FPC}
+    FillByte(Self, SizeOf(Self), 0);
+  {$ELSE}
+    ZeroMemory(@Self, SizeOf(Self));
+  {$ENDIF}
 end;
 
 function TZSTDDecompressOptions.ParamMin(AParam: ZSTD_dParameter): Integer;
@@ -571,7 +579,7 @@ begin
   if
     ((WindowLog <> 0) and ((WindowLog < WindowLogMin) or (WindowLog > WindowLogMax)))
   then
-    RaiseLastOSError(ERROR_INVALID_PARAMETER);
+    RaiseLastOSError(ZSTD_ERROR_INVALID_PARAMETER);
 end;
 
 //**************************************************************************************************
@@ -637,13 +645,13 @@ end;
 function TZSTDCompressStream.Seek(const AOffset: Int64; AOrigin: TSeekOrigin): Int64;
 begin
   Result := 0; // Make compiler happy;
-  RaiseLastOSError(ERROR_INVALID_FUNCTION);
+  RaiseLastOSError(ZSTD_ERROR_INVALID_FUNCTION);
 end;
 
 function TZSTDCompressStream.Read(var ABuffer; ACount: Longint): Longint;
 begin
   Result := 0; // Make compiler happy;
-  RaiseLastOSError(ERROR_INVALID_FUNCTION);
+  RaiseLastOSError(ZSTD_ERROR_INVALID_FUNCTION);
 end;
 
 function TZSTDCompressStream.Write(const ABuffer; ACount: Longint): Longint;
@@ -745,7 +753,7 @@ begin
   if (AOrigin <> soCurrent) or (AOffset < 0) then
     begin
       Result := 0; // Make compiler happy;
-      RaiseLastOSError(ERROR_INVALID_FUNCTION);
+      RaiseLastOSError(ZSTD_ERROR_INVALID_FUNCTION);
     end
   else
     begin
@@ -814,7 +822,11 @@ begin
         begin
           Source := FStreamOutBuffer;
           Inc(Source, FStreamOutBufferSizePos);
-          CopyMemory(Buffer, Source, AvailableCount);
+          {$IFDEF FPC}
+            Move(Source^, Buffer^, AvailableCount);
+          {$ELSE}
+            CopyMemory(Buffer, Source, AvailableCount);
+          {$ENDIF}
           Inc(FStreamOutBufferSizePos, AvailableCount);
           Inc(Buffer, AvailableCount);
           Dec(ACount, AvailableCount);
@@ -840,7 +852,7 @@ end;
 function TZSTDDecompressStream.Write(const ABuffer; ACount: Longint): Longint;
 begin
   Result := 0; // Make compiler happy;
-  RaiseLastOSError(ERROR_INVALID_FUNCTION);
+  RaiseLastOSError(ZSTD_ERROR_INVALID_FUNCTION);
 end;
 
 end.

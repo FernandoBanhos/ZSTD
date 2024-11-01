@@ -23,19 +23,28 @@ uses
   {$IFDEF MSWINDOWS}
     Windows,
   {$ENDIF}
+  {$IFDEF UNIX}
+    BaseUnix,
+  {$ENDIF}
   {$IFDEF FPC}
     DynLibs,
   {$ENDIF}
-  SysUtils;
+  SyncObjs, SysUtils;
 
 {$Z4}
 
 const
   {$IFDEF MSWINDOWS}
     ZSTDDllName = 'libzstd.dll';
+    ZSTD_ERROR_PROC_NOT_FOUND = ERROR_PROC_NOT_FOUND;
+    ZSTD_ERROR_INVALID_PARAMETER = ERROR_INVALID_PARAMETER;
+    ZSTD_ERROR_INVALID_FUNCTION = ERROR_INVALID_FUNCTION;
   {$ENDIF}
   {$IFDEF LINUX}
     ZSTDDllName = 'libzstd.so';
+    ZSTD_ERROR_PROC_NOT_FOUND = ESysENOSYS;
+    ZSTD_ERROR_INVALID_PARAMETER = ESysEINVAL;
+    ZSTD_ERROR_INVALID_FUNCTION = ESysENOSYS;
   {$ENDIF}
 
 const
@@ -1130,7 +1139,7 @@ type
   TZSTD_sizeof_DDict = function(ddict: ZSTD_DDict): size_t; cdecl;
 
 var
-  ZSTDLock: TRTLCriticalSection;
+  ZSTDLock: TCriticalSection;
   ZSTD: HMODULE;
 
   _ZSTD_versionNumber: TZSTD_versionNumber;
@@ -1200,7 +1209,8 @@ var
 
 procedure InitZSTD;
 begin
-  EnterCriticalSection(ZSTDLock);
+  ZSTDLock.Enter;
+
   try
     if ZSTD <> 0 then Exit;
     ZSTD := SafeLoadLibrary(ZSTDDllName);
@@ -1271,7 +1281,7 @@ begin
     @_ZSTD_sizeof_CDict                        := GetProcAddress(ZSTD, sZSTD_sizeof_CDict);
     @_ZSTD_sizeof_DDict                        := GetProcAddress(ZSTD, sZSTD_sizeof_DDict);
   finally
-    LeaveCriticalSection(ZSTDLock);
+    ZSTDLock.Leave;
   end;
 end;
 
@@ -1286,7 +1296,7 @@ begin
   if Assigned(@_ZSTD_versionNumber) then
     Result := _ZSTD_versionNumber
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_versionString: PAnsiChar;
@@ -1295,7 +1305,7 @@ begin
   if Assigned(@_ZSTD_versionString) then
     Result := _ZSTD_versionString
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compress(dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t; compressionLevel: int): size_t;
@@ -1304,7 +1314,7 @@ begin
   if Assigned(@_ZSTD_compress) then
     Result := _ZSTD_compress(dst, dstCapacity, src, srcSize, compressionLevel)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_decompress(dst: Pointer; dstCapacity: size_t; src: Pointer; compressedSize: size_t): size_t;
@@ -1313,7 +1323,7 @@ begin
   if Assigned(@_ZSTD_decompress) then
     Result := _ZSTD_decompress(dst, dstCapacity, src, compressedSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_getFrameContentSize(src: Pointer; srcSize: size_t): Int64;
@@ -1322,7 +1332,7 @@ begin
   if Assigned(@_ZSTD_getFrameContentSize) then
     Result := _ZSTD_getFrameContentSize(src, srcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_getDecompressedSize(src: Pointer; srcSize: size_t): Int64;
@@ -1331,7 +1341,7 @@ begin
   if Assigned(@_ZSTD_getDecompressedSize) then
     Result := _ZSTD_getDecompressedSize(src, srcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_findFrameCompressedSize(src: Pointer; srcSize: size_t): size_t;
@@ -1340,7 +1350,7 @@ begin
   if Assigned(@_ZSTD_findFrameCompressedSize) then
     Result := _ZSTD_findFrameCompressedSize(src, srcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compressBound(srcSize: size_t): size_t;
@@ -1349,7 +1359,7 @@ begin
   if Assigned(@_ZSTD_compressBound) then
     Result := _ZSTD_compressBound(srcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_isError(code: size_t): unsigned;
@@ -1367,7 +1377,7 @@ begin
   if Assigned(@_ZSTD_getErrorName) then
     Result := _ZSTD_getErrorName(code)
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_minCLevel: int;
@@ -1376,7 +1386,7 @@ begin
   if Assigned(@_ZSTD_minCLevel) then
     Result := _ZSTD_minCLevel
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_maxCLevel: int;
@@ -1385,7 +1395,7 @@ begin
   if Assigned(@_ZSTD_maxCLevel) then
     Result := _ZSTD_maxCLevel
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_createCCtx: ZSTD_CCtx;
@@ -1394,7 +1404,7 @@ begin
   if Assigned(@_ZSTD_createCCtx) then
     Result := _ZSTD_createCCtx
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_freeCCtx(cctx: ZSTD_CCtx): size_t;
@@ -1403,7 +1413,7 @@ begin
   if Assigned(@_ZSTD_freeCCtx) then
     Result := _ZSTD_freeCCtx(cctx)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compressCCtx(ctx: ZSTD_CCtx; dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t; compressionLevel: int): size_t;
@@ -1412,7 +1422,7 @@ begin
   if Assigned(@_ZSTD_compressCCtx) then
     Result := _ZSTD_compressCCtx(ctx, dst, dstCapacity, src, srcSize, compressionLevel)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_createDCtx: ZSTD_DCtx;
@@ -1421,7 +1431,7 @@ begin
   if Assigned(@_ZSTD_createDCtx) then
     Result := _ZSTD_createDCtx
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_freeDCtx(dctx: ZSTD_DCtx): size_t;
@@ -1430,7 +1440,7 @@ begin
   if Assigned(@_ZSTD_freeDCtx) then
     Result := _ZSTD_freeDCtx(dctx)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_decompressDCtx(dctx: ZSTD_DCtx; dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t): size_t;
@@ -1439,7 +1449,7 @@ begin
   if Assigned(@_ZSTD_decompressDCtx) then
     Result := _ZSTD_decompressDCtx(dctx, dst, dstCapacity, src, srcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_cParam_getBounds(cParam: ZSTD_cParameter): ZSTD_bounds;
@@ -1448,7 +1458,7 @@ begin
   if Assigned(@_ZSTD_cParam_getBounds) then
     Result := _ZSTD_cParam_getBounds(cParam)
   else
-    begin Result.error := 0; Result.lowerBound := 0; Result.upperBound := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result.error := 0; Result.lowerBound := 0; Result.upperBound := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CCtx_setParameter(cctx: ZSTD_CCtx; param: ZSTD_cParameter; value: int): size_t;
@@ -1457,7 +1467,7 @@ begin
   if Assigned(@_ZSTD_CCtx_setParameter) then
     Result := _ZSTD_CCtx_setParameter(cctx, param, value)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CCtx_setPledgedSrcSize(cctx: ZSTD_CCtx; pledgedSrcSize: Int64): size_t;
@@ -1466,7 +1476,7 @@ begin
   if Assigned(@_ZSTD_CCtx_setPledgedSrcSize) then
     Result := _ZSTD_CCtx_setPledgedSrcSize(cctx, pledgedSrcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CCtx_reset(cctx: ZSTD_CCtx; reset: ZSTD_ResetDirective): size_t;
@@ -1475,7 +1485,7 @@ begin
   if Assigned(@_ZSTD_CCtx_reset) then
     Result := _ZSTD_CCtx_reset(cctx, reset)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compress2(cctx: ZSTD_CCtx; dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t): size_t;
@@ -1484,7 +1494,7 @@ begin
   if Assigned(@_ZSTD_compress2) then
     Result := _ZSTD_compress2(cctx, dst, dstCapacity, src, srcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_dParam_getBounds(dParam: ZSTD_dParameter): ZSTD_bounds;
@@ -1493,7 +1503,7 @@ begin
   if Assigned(@_ZSTD_dParam_getBounds) then
     Result := _ZSTD_dParam_getBounds(dParam)
   else
-    begin Result.error := 0; Result.lowerBound := 0; Result.upperBound := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result.error := 0; Result.lowerBound := 0; Result.upperBound := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_DCtx_setParameter(dctx: ZSTD_DCtx; param: ZSTD_dParameter; value: int): size_t;
@@ -1502,7 +1512,7 @@ begin
   if Assigned(@_ZSTD_DCtx_setParameter) then
     Result := _ZSTD_DCtx_setParameter(dctx, param, value)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_DCtx_reset(dctx: ZSTD_DCtx; reset: ZSTD_ResetDirective): size_t;
@@ -1511,7 +1521,7 @@ begin
   if Assigned(@_ZSTD_DCtx_reset) then
     Result := _ZSTD_DCtx_reset(dctx, reset)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_createCStream: ZSTD_CStream;
@@ -1520,7 +1530,7 @@ begin
   if Assigned(@_ZSTD_createCStream) then
     Result := _ZSTD_createCStream
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_freeCStream(zcs: ZSTD_CStream): size_t;
@@ -1529,7 +1539,7 @@ begin
   if Assigned(@_ZSTD_freeCStream) then
     Result := _ZSTD_freeCStream(zcs)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compressStream2(cctx: ZSTD_CCtx; var output: ZSTD_outBuffer; var input: ZSTD_inBuffer; endOp: ZSTD_EndDirective): size_t;
@@ -1538,7 +1548,7 @@ begin
   if Assigned(@_ZSTD_compressStream2) then
     Result := _ZSTD_compressStream2(cctx, output, input, endOp)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CStreamInSize: size_t;
@@ -1547,7 +1557,7 @@ begin
   if Assigned(@_ZSTD_CStreamInSize) then
     Result := _ZSTD_CStreamInSize
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CStreamOutSize: size_t;
@@ -1556,7 +1566,7 @@ begin
   if Assigned(@_ZSTD_CStreamOutSize) then
     Result := _ZSTD_CStreamOutSize
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_initCStream(zcs: ZSTD_CStream; compressionLevel: int): size_t;
@@ -1565,7 +1575,7 @@ begin
   if Assigned(@_ZSTD_initCStream) then
     Result := _ZSTD_initCStream(zcs, compressionLevel)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compressStream(zcs: ZSTD_CStream; var output: ZSTD_outBuffer; var input: ZSTD_inBuffer): size_t;
@@ -1574,7 +1584,7 @@ begin
   if Assigned(@_ZSTD_compressStream) then
     Result := _ZSTD_compressStream(zcs, output, input)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_flushStream(zcs: ZSTD_CStream; var output: ZSTD_outBuffer): size_t;
@@ -1583,7 +1593,7 @@ begin
   if Assigned(@_ZSTD_flushStream) then
     Result := _ZSTD_flushStream(zcs, output)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_endStream(zcs: ZSTD_CStream; var output: ZSTD_outBuffer): size_t;
@@ -1592,7 +1602,7 @@ begin
   if Assigned(@_ZSTD_endStream) then
     Result := _ZSTD_endStream(zcs, output)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_createDStream: ZSTD_DStream;
@@ -1601,7 +1611,7 @@ begin
   if Assigned(@_ZSTD_createDStream) then
     Result := _ZSTD_createDStream
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_freeDStream(zds: ZSTD_DStream): size_t;
@@ -1610,7 +1620,7 @@ begin
   if Assigned(@_ZSTD_freeDStream) then
     Result := _ZSTD_freeDStream(zds)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_initDStream(zds: ZSTD_DStream): size_t;
@@ -1619,7 +1629,7 @@ begin
   if Assigned(@_ZSTD_initDStream) then
     Result := _ZSTD_initDStream(zds)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_decompressStream(zds: ZSTD_DStream; var output: ZSTD_outBuffer; var input: ZSTD_inBuffer): size_t;
@@ -1628,7 +1638,7 @@ begin
   if Assigned(@_ZSTD_decompressStream) then
     Result := _ZSTD_decompressStream(zds, output, input)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_DStreamInSize: size_t;
@@ -1637,7 +1647,7 @@ begin
   if Assigned(@_ZSTD_DStreamInSize) then
     Result := _ZSTD_DStreamInSize
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_DStreamOutSize: size_t;
@@ -1646,7 +1656,7 @@ begin
   if Assigned(@_ZSTD_DStreamOutSize) then
     Result := _ZSTD_DStreamOutSize
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compress_usingDict(ctx: ZSTD_CCtx; dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t; dict: Pointer; dictSize: size_t; compressionLevel: int): size_t;
@@ -1655,7 +1665,7 @@ begin
   if Assigned(@_ZSTD_compress_usingDict) then
     Result := _ZSTD_compress_usingDict(ctx, dst, dstCapacity, src, srcSize, dict, dictSize, compressionLevel)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_decompress_usingDict(dctx: ZSTD_DCtx; dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t; dict: Pointer; dictSize: size_t): size_t;
@@ -1664,7 +1674,7 @@ begin
   if Assigned(@_ZSTD_decompress_usingDict) then
     Result := _ZSTD_decompress_usingDict(dctx, dst, dstCapacity, src, srcSize, dict, dictSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_createCDict(dictBuffer: Pointer; dictSize: size_t; compressionLevel: int): ZSTD_CDict;
@@ -1673,7 +1683,7 @@ begin
   if Assigned(@_ZSTD_createCDict) then
     Result := _ZSTD_createCDict(dictBuffer, dictSize, compressionLevel)
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_freeCDict(CDict: ZSTD_CDict): size_t;
@@ -1682,7 +1692,7 @@ begin
   if Assigned(@_ZSTD_freeCDict) then
     Result := _ZSTD_freeCDict(CDict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_compress_usingCDict(cctx: ZSTD_CCtx; dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t; cdict: ZSTD_CDict): size_t;
@@ -1691,7 +1701,7 @@ begin
   if Assigned(@_ZSTD_compress_usingCDict) then
     Result := _ZSTD_compress_usingCDict(cctx, dst, dstCapacity, src, srcSize, cdict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_createDDict(dictBuffer: Pointer; dictSize: size_t): ZSTD_DDict;
@@ -1700,7 +1710,7 @@ begin
   if Assigned(@_ZSTD_createDDict) then
     Result := _ZSTD_createDDict(dictBuffer, dictSize)
   else
-    begin Result := nil; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := nil; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_freeDDict(ddict: ZSTD_DDict): size_t;
@@ -1709,7 +1719,7 @@ begin
   if Assigned(@_ZSTD_freeDDict) then
     Result := _ZSTD_freeDDict(ddict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_decompress_usingDDict(dctx: ZSTD_DCtx; dst: Pointer; dstCapacity: size_t; src: Pointer; srcSize: size_t; ddict: ZSTD_DDict): size_t;
@@ -1718,7 +1728,7 @@ begin
   if Assigned(@_ZSTD_decompress_usingDDict) then
     Result := _ZSTD_decompress_usingDDict(dctx, dst, dstCapacity, src, srcSize, ddict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_getDictID_fromDict(dict: Pointer; dictSize: size_t): unsigned;
@@ -1727,7 +1737,7 @@ begin
   if Assigned(@_ZSTD_getDictID_fromDict) then
     Result := _ZSTD_getDictID_fromDict(dict, dictSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_getDictID_fromDDict(ddict: ZSTD_DDict): unsigned;
@@ -1736,7 +1746,7 @@ begin
   if Assigned(@_ZSTD_getDictID_fromDDict) then
     Result := _ZSTD_getDictID_fromDDict(ddict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_getDictID_fromFrame(src: Pointer; srcSize: size_t): unsigned;
@@ -1745,7 +1755,7 @@ begin
   if Assigned(@_ZSTD_getDictID_fromFrame) then
     Result := _ZSTD_getDictID_fromFrame(src, srcSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CCtx_loadDictionary(cctx: ZSTD_CCtx; dict: Pointer; dictSize: size_t): size_t;
@@ -1754,7 +1764,7 @@ begin
   if Assigned(@_ZSTD_CCtx_loadDictionary) then
     Result := _ZSTD_CCtx_loadDictionary(cctx, dict, dictSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CCtx_refCDict(cctx: ZSTD_CCtx; cdict: ZSTD_CDict): size_t;
@@ -1763,7 +1773,7 @@ begin
   if Assigned(@_ZSTD_CCtx_refCDict) then
     Result := _ZSTD_CCtx_refCDict(cctx, cdict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_CCtx_refPrefix(cctx: ZSTD_CCtx; prefix: Pointer; prefixSize: size_t): size_t;
@@ -1772,7 +1782,7 @@ begin
   if Assigned(@_ZSTD_CCtx_refPrefix) then
     Result := _ZSTD_CCtx_refPrefix(cctx, prefix, prefixSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_DCtx_loadDictionary(dctx: ZSTD_DCtx; dict: Pointer; dictSize: size_t): size_t;
@@ -1781,7 +1791,7 @@ begin
   if Assigned(@_ZSTD_DCtx_loadDictionary) then
     Result := _ZSTD_DCtx_loadDictionary(dctx, dict, dictSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_DCtx_refDDict(dctx: ZSTD_DCtx; ddict: ZSTD_DDict): size_t;
@@ -1790,7 +1800,7 @@ begin
   if Assigned(@_ZSTD_DCtx_refDDict) then
     Result := _ZSTD_DCtx_refDDict(dctx, ddict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_DCtx_refPrefix(dctx: ZSTD_DCtx; prefix: Pointer; prefixSize: size_t): size_t;
@@ -1799,7 +1809,7 @@ begin
   if Assigned(@_ZSTD_DCtx_refPrefix) then
     Result := _ZSTD_DCtx_refPrefix(dctx, prefix, prefixSize)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_sizeof_CCtx(cctx: ZSTD_CCtx): size_t;
@@ -1808,7 +1818,7 @@ begin
   if Assigned(@_ZSTD_sizeof_CCtx) then
     Result := _ZSTD_sizeof_CCtx(cctx)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_sizeof_DCtx(dctx: ZSTD_DCtx): size_t;
@@ -1817,7 +1827,7 @@ begin
   if Assigned(@_ZSTD_sizeof_DCtx) then
     Result := _ZSTD_sizeof_DCtx(dctx)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_sizeof_CStream(zcs: ZSTD_CStream ): size_t;
@@ -1826,7 +1836,7 @@ begin
   if Assigned(@_ZSTD_sizeof_CStream) then
     Result := _ZSTD_sizeof_CStream(zcs)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_sizeof_DStream(zds: ZSTD_DStream): size_t;
@@ -1835,7 +1845,7 @@ begin
   if Assigned(@_ZSTD_sizeof_DStream) then
     Result := _ZSTD_sizeof_DStream(zds)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_sizeof_CDict(cdict: ZSTD_CDict): size_t;
@@ -1844,7 +1854,7 @@ begin
   if Assigned(@_ZSTD_sizeof_CDict) then
     Result := _ZSTD_sizeof_CDict(cdict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTD_sizeof_DDict(ddict: ZSTD_DDict): size_t;
@@ -1853,7 +1863,7 @@ begin
   if Assigned(@_ZSTD_sizeof_DDict) then
     Result := _ZSTD_sizeof_DDict(ddict)
   else
-    begin Result := 0; RaiseLastOSError(ERROR_PROC_NOT_FOUND); end;
+    begin Result := 0; RaiseLastOSError(ZSTD_ERROR_PROC_NOT_FOUND); end;
 end;
 
 function ZSTDIsLoaded: boolean;
@@ -1863,12 +1873,12 @@ begin
 end;
 
 initialization
-  InitializeCriticalSection(ZSTDLock);
+  ZSTDLock := TCriticalSection.Create;
   ZSTD := 0;
 
 finalization
   DoneZSTD;
-  DeleteCriticalSection(ZSTDLock);
+  FreeAndNil(ZSTDLock);
 {$ENDIF}
 
 end.
